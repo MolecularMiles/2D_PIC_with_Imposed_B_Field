@@ -23,7 +23,7 @@ from numpy import matmul
 n_x_points = 50
 n_y_points = 50
 
-x_spacing = 10**(-3.0)
+x_spacing = 10**(-1.0)
 y_spacing = x_spacing
 
 
@@ -39,7 +39,7 @@ permitivitty = 8.85*(10**(-12.0))
 #atom parameters. --------
 # We assume an overall neutral plasma, calculated using the n_atoms metric. Ions act as a stable background due to their high mass, evenly distributed
 #across the charge lattice points.
-n_atoms = 1000
+n_atoms = 1
 e_charge = -1.602*(10**-19.0)
 #mass = 1
 mass = 9.109*(10**(-31.0))
@@ -53,7 +53,7 @@ boltz = 1.380649*(10**(-23.0))
 
 probe_x = int(n_x_points/2)
 probe_y = int(n_y_points/2)
-probe_charge = e_charge*10
+probe_charge = e_charge
 
 
 
@@ -61,19 +61,19 @@ probe_charge = e_charge*10
 
 
 
-upper_pot = 0.0
-lower_pot = 0.0
-right_pot = 0.0
-left_pot = 0.0
-left_pot = 0.0
+upper_pot = 0.0000000000000000000000020
+lower_pot = 0.0000000000000000000000020
+right_pot = 0.0000000000000000000000020
+left_pot = 0.0000000000000000000000020
+left_pot = 0.0000000000000000000000020
 
 
 
 #simulation time parameters
-n_steps = 10000
+n_steps = 300
 t = 0
-dt = 1000000000/e_plasma_freq
-dt = 1/(1*e_plasma_freq)
+dt = 1/e_plasma_freq
+dt = 1/(10*e_plasma_freq)
 
 t_f = n_steps*dt
 inc_wave_freq = 20/(dt*n_steps)
@@ -110,7 +110,7 @@ def B_z_field(x, y, B_o): #mess with the B_z function to impose any functional f
 b_z_lattice = (numpy.ones((n_y_points, n_x_points)))
 for i in range(0, n_x_points):
     for j in range(0, n_y_points):
-            b_z_lattice[j, i] = B_z_field(x_spacing*(i-(n_x_points/2)), y_spacing*(j+(n_y_points/2)), 0.000000001)
+            b_z_lattice[j, i] = B_z_field(x_spacing*(i-(n_x_points/2)), y_spacing*(j+(n_y_points/2)), 0)
 
 
 #Creating the array to invert and multiply the charge vector in the solution to poisson's equation via finite differences.
@@ -163,6 +163,7 @@ for i in range(0, (n_x_points - (2*wall_width))):
     if i%10 == 0:
         print("Made it to row " + str(i)+ " out of " +str(n_y_points))
 print("Built the matrix. Inverting it now...")
+print(final_matrix)
 final_matrix = inv(final_matrix)
 print("Inverted the matrix. Now starting the simulation...")
 
@@ -295,16 +296,22 @@ def get_acceleration(magnetic_field, electric_field_x, electric_field_y, atom_po
 
 
 #Velocity Verlet algorithm to make everything move. 
+
 def Verlet_Step(atom_position, atom_veloc, atom_accel, dt, wave_freq, t_wave, mag_field):
     for i in range(0, n_atoms):
-        atom_position[i,0] += dt*atom_veloc[i,0] + 0.5*(dt**2.0)*atom_accel[i, 0]
-        atom_position[i,1] += dt*atom_veloc[i,1] + 0.5*(dt**2.0)*atom_accel[i, 1]
-    old_accel = atom_accel
+        atom_veloc[i,0] += 0.5*(dt)*atom_accel[i, 0]
+        atom_veloc[i,1] += 0.5*(dt)*atom_accel[i, 1]
+
+
+    for i in range(0, n_atoms):
+        atom_position[i,0] += dt*atom_veloc[i,0]
+        atom_position[i,1] += dt*atom_veloc[i,1]
+
     new_field_x, new_field_y, potential, charges_dist = calculate_field(grid_assign(atom_position), wave_freq, t_wave)
     atom_accel = get_acceleration(mag_field, new_field_x, new_field_y, atom_position, atom_veloc)
     for i in range(0, n_atoms):
-        atom_veloc[i, 0] += 0.5*(old_accel[i, 0] + atom_accel[i, 0])*dt
-        atom_veloc[i, 1] += 0.5*(old_accel[i, 1] + atom_accel[i, 1])*dt
+        atom_veloc[i, 0] += 0.5*(atom_accel[i, 0])*dt
+        atom_veloc[i, 1] += 0.5*(atom_accel[i, 1])*dt
     
     for i in range(0, n_atoms): #Hard Wall BC
         if atom_position[i, 0] >= (n_x_points-(wall_width+1))*x_spacing:
@@ -320,6 +327,9 @@ def Verlet_Step(atom_position, atom_veloc, atom_accel, dt, wave_freq, t_wave, ma
             atom_veloc[i, 1] = -atom_veloc[i, 1]
     
     return(atom_position, atom_veloc, atom_accel, new_field_x, new_field_y, potential, charges_dist)
+
+
+
 
 #Some debugging that I needed to do:
 """
@@ -352,6 +362,19 @@ def get_temperature(velocity_array):
         ms_speed += ((vx_pedestal**2.0) + (vy_pedestal**2.0))/n_atoms
     temperature = mass*ms_speed/(2*boltz)
     return(temperature)
+
+def get_kinetic(velocity_array):
+    kinetic = 0
+    for i in range(0, n_atoms):
+        vx_pedestal = velocity_array[i, 0]
+        vy_pedestal = velocity_array[i, 1]
+        kinetic += ((vx_pedestal**2.0) + (vy_pedestal**2.0))*0.5*mass
+    return(kinetic)
+
+def get_potential_energy(charge_dist, potential_dist):
+    energy_matrix = matmul(charge_dist, potential_dist)
+    return(sum(energy_matrix))
+
 
 def debye_distribution(position_array): #looking for the density distribution around the central point.  
     n_debye_bins = 50
@@ -482,6 +505,8 @@ while t <= t_f:
     #pyplot.savefig(filename)
     #pyplot.close()
     if counter%sample_rate == 0:
+
+        print()
         plot_float_index, plot_int_index = math.modf(counter/sample_rate)
         plot_int_index = int(plot_int_index)
         bins, rdf = get_rdf(positions)
