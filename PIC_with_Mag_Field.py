@@ -20,10 +20,10 @@ from numpy import matmul
 
 #_-_-_-_-_-Global simulation variables-_-_-_-_-_-_
 #The lattice we'll assign charges to.---------
-n_x_points = 50
-n_y_points = 50
+n_x_points = 80
+n_y_points = 80
 
-x_spacing = 10**(-1.0)
+x_spacing = 10**(-10.0)
 y_spacing = x_spacing
 
 
@@ -39,7 +39,7 @@ permitivitty = 8.85*(10**(-12.0))
 #atom parameters. --------
 # We assume an overall neutral plasma, calculated using the n_atoms metric. Ions act as a stable background due to their high mass, evenly distributed
 #across the charge lattice points.
-n_atoms = 1
+n_atoms = 1000
 e_charge = -1.602*(10**-19.0)
 #mass = 1
 mass = 9.109*(10**(-31.0))
@@ -47,33 +47,33 @@ e_number_density = n_atoms/box_area
 print("number density: " + str(e_number_density))
 e_plasma_freq = (((e_number_density*(e_charge**2.0))/(mass*permitivitty))**0.5)/(2*pi) #Hz
 n_points = n_x_points*n_y_points
+
 ion_charge = (n_atoms*(-e_charge))/n_points #background ion charge
 e_wave = 1.0
 boltz = 1.380649*(10**(-23.0))
 
 probe_x = int(n_x_points/2)
 probe_y = int(n_y_points/2)
-probe_charge = e_charge
+probe_charge = -e_charge*3
 
 
 
 #boundary conditions. 
 
 
-
-upper_pot = 0.0000000000000000000000020
-lower_pot = 0.0000000000000000000000020
-right_pot = 0.0000000000000000000000020
-left_pot = 0.0000000000000000000000020
-left_pot = 0.0000000000000000000000020
+upper_pot = 0
+lower_pot = 0
+right_pot = 0
+left_pot = 0
+left_pot = 0
 
 
 
 #simulation time parameters
-n_steps = 300
+n_steps = 3000
 t = 0
 dt = 1/e_plasma_freq
-dt = 1/(10*e_plasma_freq)
+dt = 1/(1000*e_plasma_freq)
 
 t_f = n_steps*dt
 inc_wave_freq = 20/(dt*n_steps)
@@ -82,7 +82,7 @@ inc_wave_freq = 0
 print("Plasma frequency: " + str(e_plasma_freq) + " Hz")
 
 #atom data arrays
-vel_deviation = 0
+vel_deviation = 100
 positions = numpy.array([])
 velocities = numpy.random.normal(0, vel_deviation, size = (n_atoms, 2))
 accelerations = numpy.zeros((n_atoms, 2))
@@ -205,10 +205,10 @@ def grid_assign(atom_positions):
         print(y_3)
         print(positions)
         """
-        charge_lattice[y_1, x_1] += ((w_1*e_charge)) 
-        charge_lattice[y_2, x_2] += ((w_2*e_charge))
-        charge_lattice[y_3, x_3] += ((w_3*e_charge))
-        charge_lattice[y_4, x_4] += ((w_4*e_charge))
+        charge_lattice[y_1, x_1] += ((w_1*e_charge)/(x_spacing*y_spacing)) 
+        charge_lattice[y_2, x_2] += ((w_2*e_charge)/(x_spacing*y_spacing))
+        charge_lattice[y_3, x_3] += ((w_3*e_charge)/(x_spacing*y_spacing))
+        charge_lattice[y_4, x_4] += ((w_4*e_charge)/(x_spacing*y_spacing))
     #charge_lattice = numpy.flip(charge_lattice, 1)
     #charge_lattice = numpy.flip(charge_lattice, 0)
     """
@@ -216,7 +216,7 @@ def grid_assign(atom_positions):
         for i in range(0, wall_width+1):
             charge_lattice[j, i] = 0.00000001/permitivitty
     """
-    charge_lattice[probe_y, probe_x] = probe_charge#chucking a charge in there to see if we get debye screening. 
+    charge_lattice[probe_y, probe_x] = probe_charge/(x_spacing*y_spacing)#chucking a charge in there to see if we get debye screening. 
     return(charge_lattice)
 
 #Potential calculation. Takes in the charge lattice, and calculates the potential based on finite differencing. We assume we are in a grounded box (pot = specified at edges.)
@@ -377,7 +377,7 @@ def get_potential_energy(charge_dist, potential_dist):
 
 
 def debye_distribution(position_array): #looking for the density distribution around the central point.  
-    n_debye_bins = 50
+    n_debye_bins = 100
     point_counter = 0
     sep_array = numpy.array([])
     debye_bins = numpy.array([])
@@ -478,6 +478,9 @@ def get_speed_dist(velocity_array):
 
 
 
+debye = ((permitivitty*boltz*get_temperature(velocities))/(e_number_density*2*(e_charge**2.0)))**0.5
+print("debye length: " + str(debye))
+print("cell length: " + str(x_spacing))
 
 #Saving the animation as a gif. Used the tutorial from (https://towardsdatascience.com/basics-of-gifs-with-pythons-matplotlib-54dd544b6f30)
 counter = 0
